@@ -6,6 +6,7 @@ import os
 import sys
 import time
 import random
+import json
 from typing import Dict, TypedDict, NotRequired
 from langchain_community.chat_models.ollama import ChatOllama
 from langgraph.graph import StateGraph
@@ -63,11 +64,10 @@ def trim_backtick_content(text: str) -> str:
 
 # ---------- ノード定義 ----------
 def entry_node(state: AppState):
-    from pathlib import Path
     raw = state.get("project_dir")
     if not raw:
         raise ValueError("project_dir is not set in initial state")
-    resolved = Path(raw).resolve()
+    resolved = pathlib.Path(raw).resolve()
     print(f"DEBUG entry_node: initial state keys = {list(state.keys())}")
     log_progress(state, f"entry_node: project_dir resolved to {resolved}")
     state["project_dir"] = resolved.as_posix()
@@ -129,6 +129,32 @@ def consistency_check(state: AppState):
 def finalize(state: AppState):
     log_progress(state, "build 完了 🎉")
     return {}
+
+# ---------- ファイル依存抽出 ----------
+def extract_python_dependencies(project_dir: str) -> set[str]:
+    stdlib_ignore = {"os", "sys", "time", "random", "re", "pathlib", "hashlib", "typing", "argparse", "json", "traceback"}
+    deps = set()
+    for py_file in pathlib.Path(project_dir).rglob("*.py"):
+        try:
+            text = py_file.read_text(encoding="utf-8")
+        except Exception:
+            continue
+        imports = re.findall(r"^\s*(?:import|from)\s+([\w\.]+)", text, re.MULTILINE)
+        for imp in imports:
+            root = imp.split(".")[0]
+            if root not in stdlib_ignore:
+                deps.add(root)
+    return deps
+
+def extract_node_dependencies(project_dir: str) -> dict:
+    pkg_path = pathlib.Path(project_dir) / "frontend" / "package.json"
+    if not pkg_path.exists():
+        return {}
+    try:
+        pkg = json.loads(pkg_path.read_text(encoding="utf-8"))
+        return pkg.get("dependencies", {})
+    except Exception:
+        return {}
 
 # ---------- 出力ファイル一覧 ----------
 FILE_KEYS = [
@@ -199,28 +225,41 @@ if __name__ == "__main__":
     parser.add_argument("--out", "-o", default=None, help="出力先フォルダ名（省略時自動生成）")
     args = parser.parse_args()
 
-    # prepare_state() によって project_dir も含めた状態を生成
     state = prepare_state(args.design, args.out)
-
     print(f"CLI: using output folder {state['project_dir']}")
-
-    # ビルド前に確認待ち
     input("Enterキーでビルドを開始します（確認後に進めたい場合）→ ")
 
     graph = build(group_size=3)
     result = graph.invoke(state)
 
-    # ビルド進捗ログを表示
     print("\n=== BUILD PROGRESS ===")
     for msg in result.get("progress", []):
         print(msg)
 
-    # 整合性チェック結果
     print("\n=== CHECK RESULT ===", result.get("check_result"))
-
-    # 書き出したファイル一覧
     print("\n=== WRITTEN FILES ===")
     for p in result.get("written", []):
         print(" -", p)
 
-    sys.exit(0) 
+    print("\n=== PYTHON DEPENDENCIES ===")
+    py_deps = extract_python_dependencies(state["project_dir"])
+    if py_deps:
+        sorted_deps = sorted(py_deps)
+        for dep in sorted_deps:
+            print(" -", dep)
+        req_txt = "\n".join(sorted_deps)
+        req_path = pathlib.Path(state["project_dir"]) / "requirements.txt"
+        req_path.write_text(req_txt, encoding="utf-8")
+        print(f"\n📝 requirements.txt を生成しました → {req_path}")
+    else:
+        print("（外部依存モジュールなし）")
+
+    print("\n=== NODE DEPENDENCIES (from package.json) ===")
+    node_deps = extract_node_dependencies(state["project_dir"])
+    if node_deps:
+        for k, v in node_deps.items():
+            print(f" - {k}: {v}")
+    else:
+        print("（frontend/package.json が存在しないか、依存なし）")
+
+    sys.exit(0)
