@@ -21,8 +21,8 @@ pip install -r requirements.txt
 Prepare and launch local LLM (Qwen3:8B):
 
 ```bash
-ollama pull qwen:8b
-ollama run qwen:8b
+ollama pull qwen3:8b
+ollama run qwen3:8b
 ```
 
 ### 3. GUI アプリの起動  
