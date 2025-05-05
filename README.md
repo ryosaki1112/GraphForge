@@ -30,6 +30,7 @@ Launch the Streamlit GUI:
 
 ```bash
 streamlit run main.py
+
 ```
 
 ---
