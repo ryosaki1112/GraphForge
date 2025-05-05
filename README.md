@@ -34,7 +34,7 @@ ollama run qwen:8b
 Run Streamlit GUI:
 
 ```bash
-streamlit run gui_app.py
+streamlit run dashboard.py
 ```
 
 ---
