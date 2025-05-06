@@ -68,7 +68,6 @@ def entry_node(state: AppState):
     if not raw:
         raise ValueError("project_dir is not set in initial state")
     resolved = pathlib.Path(raw).resolve()
-    print(f"DEBUG entry_node: initial state keys = {list(state.keys())}")
     log_progress(state, f"entry_node: project_dir resolved to {resolved}")
     state["project_dir"] = resolved.as_posix()
     return state
@@ -84,7 +83,6 @@ def parse_design(state: AppState):
 
 def gen_and_write(state: AppState, filekey: str):
     log_progress(state, f"gen: {filekey} を生成中")
-    log_progress(state, f"→ LLM 呼び出し開始: {filekey}")
     prompt = f"Generate `{filekey}` according to these design sections:\n{state['sections']}"
     try:
         raw = safe_invoke(prompt)
@@ -114,11 +112,7 @@ def gen_and_write(state: AppState, filekey: str):
 
 def consistency_check(state: AppState):
     log_progress(state, "consistency_check: 整合性チェック中")
-    files = {
-        k: state[k]
-        for k in state
-        if k.endswith(('.py', '.json', '.jsx')) and isinstance(state[k], str)
-    }
+    files = {k: state[k] for k in state if k.endswith((' .py', '.json', '.jsx')) and isinstance(state[k], str)}
     issues = quick_check(files)
     if issues:
         log_progress(state, "consistency_check: STATIC_ISSUES 検出")
@@ -128,6 +122,21 @@ def consistency_check(state: AppState):
 
 def finalize(state: AppState):
     log_progress(state, "build 完了 🎉")
+    # structure.json 書き出し
+    project_dir = pathlib.Path(state['project_dir'])
+    app_dir = project_dir / 'app'
+    app_dir.mkdir(parents=True, exist_ok=True)
+    structure = {
+        'sections': state.get('sections', ''),
+        'written': state.get('written', []),
+        'python_deps': sorted(list(extract_python_dependencies(str(project_dir)))),
+        'node_deps': extract_node_dependencies(str(project_dir)),
+        'file_keys': FILE_KEYS
+    }
+    struct_path = app_dir / 'structure.json'
+    with struct_path.open('w', encoding='utf-8') as f:
+        json.dump(structure, f, ensure_ascii=False, indent=2)
+    log_progress(state, f"structure.json を書き出し: {struct_path}")
     return {}
 
 # ---------- ファイル依存抽出 ----------

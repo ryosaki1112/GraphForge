@@ -18,7 +18,8 @@ def load_structure(project_dir: str) -> dict[str, Any] | None:
 
 # --- build用追記 ---
 def record_structure(state: dict):
-    from .graph_build import FILE_KEYS, extract_python_dependencies
+    from config import FILE_KEYS
+    from .graph_build import extract_python_dependencies
     project_dir = state.get("project_dir")
     if not project_dir:
         return
