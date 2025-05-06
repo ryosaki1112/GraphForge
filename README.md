@@ -47,7 +47,7 @@ streamlit run main.py
 | 🧪 静的整合性チェック | Built-in static validation loop |
 | 🧰 セクション分割編集 | Edit each section of `.sections` individually |
 | 🔁 再アップロード対応 | Rebuild from updated markdown input |
-|⚙️ 改修モード（準備中）| Refactor existing code via structure-aware workflow (coming soon)|
+|⚙️ 改修モード　| Refactor existing code via structure-aware workflow |
 ---
 
 ## 📝 仕様入力例 / Example Spec Input
